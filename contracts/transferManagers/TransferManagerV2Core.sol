@@ -12,7 +12,7 @@ abstract contract TransferManagerV2Core is Ownable {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     // Whether user has approved operator
-    mapping(address => mapping(address => bool)) public hasUserApprovedOperator;
+    mapping(address => mapping(address => bool)) internal _hasUserApprovedOperator;
 
     // Whitelist of operators
     EnumerableSet.AddressSet internal _whitelistedOperators;
@@ -32,8 +32,8 @@ abstract contract TransferManagerV2Core is Ownable {
 
         for (uint256 i; i < operators.length; i++) {
             require(_whitelistedOperators.contains(operators[i]), "Approval: Not whitelisted");
-            require(!hasUserApprovedOperator[msg.sender][operators[i]], "Approval: Already approved");
-            hasUserApprovedOperator[msg.sender][operators[i]] = true;
+            require(!_hasUserApprovedOperator[msg.sender][operators[i]], "Approval: Already approved");
+            _hasUserApprovedOperator[msg.sender][operators[i]] = true;
         }
 
         emit ApprovalsGranted(msg.sender, operators);
@@ -48,8 +48,8 @@ abstract contract TransferManagerV2Core is Ownable {
         require(operators.length > 0, "Approval: Length must be > 0");
 
         for (uint256 i; i < operators.length; i++) {
-            require(hasUserApprovedOperator[msg.sender][operators[i]], "Revoke: Not approved");
-            hasUserApprovedOperator[msg.sender][operators[i]] = false;
+            require(_hasUserApprovedOperator[msg.sender][operators[i]], "Revoke: Not approved");
+            _hasUserApprovedOperator[msg.sender][operators[i]] = false;
         }
 
         emit ApprovalsRemoved(msg.sender, operators);
@@ -83,7 +83,26 @@ abstract contract TransferManagerV2Core is Ownable {
      * @param operator address of the operator
      */
     function _isTransferValid(address user, address operator) internal view returns (bool) {
-        return _whitelistedOperators.contains(operator) && hasUserApprovedOperator[user][operator];
+        return _whitelistedOperators.contains(operator) && _hasUserApprovedOperator[user][operator];
+    }
+
+    /**
+     * @notice Check whether user has approved a list of operator addresses
+     * @param user address of the user
+     * @param operators array of operator addresses
+     */
+    function hasUserApprovedOperators(address user, address[] calldata operators)
+        external
+        view
+        returns (bool[] memory)
+    {
+        bool[] memory operatorApprovals = new bool[](operators.length);
+
+        for (uint256 i; i < operators.length; i++) {
+            operatorApprovals[i] = _hasUserApprovedOperator[user][operators[i]];
+        }
+
+        return operatorApprovals;
     }
 
     /**
