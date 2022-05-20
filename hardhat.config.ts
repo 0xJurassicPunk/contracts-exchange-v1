@@ -40,6 +40,10 @@ const config: HardhatUserConfig = {
         version: "0.4.18",
         settings: { optimizer: { enabled: true, runs: 999 } },
       },
+      {
+        version: "0.8.14",
+        settings: { optimizer: { enabled: true, runs: 888888 } },
+      },
     ],
   },
   paths: {
