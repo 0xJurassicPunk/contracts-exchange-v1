@@ -11,12 +11,6 @@ import {ITransferManagerNFT} from "../interfaces/ITransferManagerNFT.sol";
  * @dev There is a whitelist set at this contract level and users must also approve each operator.
  */
 contract TransferManagerV2ERC721 is ITransferManagerNFT, TransferManagerV2Core {
-    // Whether transfer manager should use safeTransferFrom (vs. transferFrom)
-    bool public isDefaultSafeTransfer;
-
-    event SafeTransfersActivated();
-    event SafeTransfersDeactivated();
-
     /**
      * @notice Transfer ERC721 tokenId
      * @param collection address of the collection
@@ -33,12 +27,7 @@ contract TransferManagerV2ERC721 is ITransferManagerNFT, TransferManagerV2Core {
         uint256
     ) external override {
         require(_isTransferValid(from, msg.sender), "Transfer: Not valid");
-
-        if (!isDefaultSafeTransfer) {
-            IERC721(collection).transferFrom(from, to, tokenId);
-        } else {
-            IERC721(collection).safeTransferFrom(from, to, tokenId, "");
-        }
+        IERC721(collection).transferFrom(from, to, tokenId);
     }
 
     /**
@@ -58,36 +47,8 @@ contract TransferManagerV2ERC721 is ITransferManagerNFT, TransferManagerV2Core {
     ) external {
         require(collections.length == tokenIds.length, "Transfer: Wrong lengths");
         require(from == msg.sender || _isTransferValid(from, msg.sender), "Transfer: Not valid");
-
-        if (!isDefaultSafeTransfer || to.code.length == 0) {
-            for (uint256 i; i < collections.length; i++) {
-                IERC721(collections[i]).transferFrom(from, to, tokenIds[i]);
-            }
-        } else {
-            // If recipient is a contract and defaultSafeTransfer is on
-            for (uint256 i; i < collections.length; i++) {
-                IERC721(collections[i]).safeTransferFrom(from, to, tokenIds[i], "");
-            }
+        for (uint256 i; i < collections.length; i++) {
+            IERC721(collections[i]).transferFrom(from, to, tokenIds[i]);
         }
-    }
-
-    /**
-     * @notice Update transfers not to perform "safe checks" if recipient is contract
-     */
-    function updateTransfersToSafe() external onlyOwner {
-        require(!isDefaultSafeTransfer, "Update: Transfers already safe");
-        isDefaultSafeTransfer = true;
-
-        emit SafeTransfersActivated();
-    }
-
-    /**
-     * @notice Update transfers not to perform "safe checks" if recipient is contract
-     */
-    function updateTransfersNotToSafe() external onlyOwner {
-        require(isDefaultSafeTransfer, "Update: Transfers must be safe");
-        isDefaultSafeTransfer = false;
-
-        emit SafeTransfersDeactivated();
     }
 }
