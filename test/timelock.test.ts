@@ -54,13 +54,53 @@ describe("Timelock", () => {
 
       const eta = BigNumber.from(await latest())
         .add(await timelock.delay())
-        .add(1);
+        .add(5000000);
 
       await timelock.connect(admin).queueTransaction(looksRareExchange.address, value, signature, data, eta);
       await increaseTo(eta);
 
       await timelock.connect(admin).executeTransaction(looksRareExchange.address, value, signature, data, eta);
       assert.equal(await looksRareExchange.owner(), newAdmin);
+    });
+
+    it("Timelock contract cannot transfer exchange before ETA", async () => {
+      const value = 0;
+      const signature = "transferOwnership(address)";
+      const newAdmin = accounts[5].address;
+
+      // Fee recipient encoded
+      const data = defaultAbiCoder.encode(["address"], [newAdmin]);
+
+      const eta = BigNumber.from(await latest())
+        .add(await timelock.delay())
+        .add(5000000);
+
+      await timelock.connect(admin).queueTransaction(looksRareExchange.address, value, signature, data, eta);
+      await increaseTo(eta.sub(1));
+
+      await expect(
+        timelock.connect(admin).executeTransaction(looksRareExchange.address, value, signature, data, eta)
+      ).to.be.revertedWith("Timelock::executeTransaction: Transaction hasn't surpassed time lock.");
+    });
+
+    it("Timelock contract cannot transfer exchange after ETA + grace period", async () => {
+      const value = 0;
+      const signature = "transferOwnership(address)";
+      const newAdmin = accounts[5].address;
+
+      // Fee recipient encoded
+      const data = defaultAbiCoder.encode(["address"], [newAdmin]);
+
+      const eta = BigNumber.from(await latest())
+        .add(await timelock.delay())
+        .add(5000000);
+
+      await timelock.connect(admin).queueTransaction(looksRareExchange.address, value, signature, data, eta);
+      await increaseTo(eta.add(await timelock.GRACE_PERIOD()).add(1));
+
+      await expect(
+        timelock.connect(admin).executeTransaction(looksRareExchange.address, value, signature, data, eta)
+      ).to.be.revertedWith("Timelock::executeTransaction: Transaction is stale.");
     });
 
     it("Queuing is only callable by the timelock", async () => {
@@ -111,6 +151,12 @@ describe("Timelock", () => {
     it("Cannot set admin without timelocking", async () => {
       await expect(timelock.connect(admin).setPendingAdmin(admin.address)).to.be.revertedWith(
         "Timelock::setPendingAdmin: Call must come from Timelock."
+      );
+    });
+
+    it("Cannot change admin without timelocking", async () => {
+      await expect(timelock.connect(admin).setDelay("120000")).to.be.revertedWith(
+        "Timelock::setDelay: Call must come from Timelock."
       );
     });
   });
